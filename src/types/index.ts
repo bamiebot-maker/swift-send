@@ -46,6 +46,7 @@ export interface Transaction {
   recipientAmount: number;
   recipientName: string;
   recipientPhone: string;
+  recipientEmail?: string;
   status: 'pending' | 'completed' | 'failed';
   timestamp: Date;
   exchangeRate?: number;

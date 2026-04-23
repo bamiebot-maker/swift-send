@@ -55,6 +55,7 @@ export const transactions: Transaction[] = [
     recipientAmount: 199.50,
     recipientName: 'Juan Garcia',
     recipientPhone: '+52 55 1234 5678',
+    recipientEmail: 'juan.garcia@example.com',
     status: 'completed',
     timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 mins ago
     exchangeRate: 17.25,
@@ -68,6 +69,7 @@ export const transactions: Transaction[] = [
     recipientAmount: 499.00,
     recipientName: 'Rosa Martinez',
     recipientPhone: '+63 917 123 4567',
+    recipientEmail: 'rosa.martinez@example.com',
     status: 'completed',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
     exchangeRate: 56.50,
@@ -81,6 +83,7 @@ export const transactions: Transaction[] = [
     recipientAmount: 149.65,
     recipientName: 'Carlos Reyes',
     recipientPhone: '+502 5555 1234',
+    recipientEmail: 'carlos.reyes@example.com',
     status: 'pending',
     timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 mins ago
     exchangeRate: 7.85,
@@ -94,6 +97,7 @@ export const transactions: Transaction[] = [
     recipientAmount: 100,
     recipientName: 'Pedro Morales',
     recipientPhone: '+1 (555) 987-6543',
+    recipientEmail: 'pedro.morales@example.com',
     status: 'completed',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
   },

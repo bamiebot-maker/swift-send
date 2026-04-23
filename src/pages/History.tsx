@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronDown, Search, Filter, Calendar, Banknote, TrendingUp, Clock, ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ArrowUpDown, Banknote, Calendar, ChevronDown, Clock, Filter, Search, TrendingUp, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { TransactionItem } from '@/components/TransactionItem';
@@ -10,12 +10,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useNavigate } from 'react-router-dom';
 
+type SortOption = 'latest' | 'oldest' | 'highest' | 'lowest' | 'status';
+
 const History: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [amountMin, setAmountMin] = useState('');
+  const [amountMax, setAmountMax] = useState('');
+  const [sortBy, setSortBy] = useState<SortOption>('latest');
   const [showFilters, setShowFilters] = useState(false);
   const [expandedTransactionId, setExpandedTransactionId] = useState<string | null>(null);
 
@@ -39,18 +46,67 @@ const History: React.FC = () => {
     return { totalSent, totalFees, pendingTransactions, thisMonth };
   }, [user?.transactions]);
 
-  // Filter transactions based on search and filters
+  const resetFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setTypeFilter('all');
+    setDateFrom('');
+    setDateTo('');
+    setAmountMin('');
+    setAmountMax('');
+    setSortBy('latest');
+  };
+
+  const activeFilterCount = useMemo(() => {
+    return [
+      searchTerm.trim(),
+      statusFilter !== 'all',
+      typeFilter !== 'all',
+      dateFrom,
+      dateTo,
+      amountMin,
+      amountMax,
+      sortBy !== 'latest',
+    ].filter(Boolean).length;
+  }, [amountMax, amountMin, dateFrom, dateTo, searchTerm, sortBy, statusFilter, typeFilter]);
+
+  // Filter and sort transactions based on search, date, amount, status, and type.
   const filteredTransactions = useMemo(() => {
-    return (user?.transactions || []).filter(transaction => {
-      const matchesSearch = transaction.recipientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           transaction.recipientPhone?.includes(searchTerm) ||
-                           transaction.recipientEmail?.includes(searchTerm);
+    const fromDate = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null;
+    const toDate = dateTo ? new Date(`${dateTo}T23:59:59`) : null;
+    const minAmount = amountMin === '' ? null : Number(amountMin);
+    const maxAmount = amountMax === '' ? null : Number(amountMax);
+
+    const filtered = (user?.transactions || []).filter(transaction => {
+      const search = searchTerm.trim().toLowerCase();
+      const matchesSearch = !search ||
+        transaction.recipientName.toLowerCase().includes(search) ||
+        transaction.recipientPhone?.toLowerCase().includes(search) ||
+        transaction.recipientEmail?.toLowerCase().includes(search);
       const matchesStatus = statusFilter === 'all' || transaction.status === statusFilter;
       const matchesType = typeFilter === 'all' || transaction.type === typeFilter;
+      const matchesDateFrom = !fromDate || transaction.timestamp >= fromDate;
+      const matchesDateTo = !toDate || transaction.timestamp <= toDate;
+      const matchesMinAmount = minAmount === null || transaction.amount >= minAmount;
+      const matchesMaxAmount = maxAmount === null || transaction.amount <= maxAmount;
       
-      return matchesSearch && matchesStatus && matchesType;
+      return matchesSearch &&
+        matchesStatus &&
+        matchesType &&
+        matchesDateFrom &&
+        matchesDateTo &&
+        matchesMinAmount &&
+        matchesMaxAmount;
     });
-  }, [user?.transactions, searchTerm, statusFilter, typeFilter]);
+
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'oldest') return a.timestamp.getTime() - b.timestamp.getTime();
+      if (sortBy === 'highest') return b.amount - a.amount;
+      if (sortBy === 'lowest') return a.amount - b.amount;
+      if (sortBy === 'status') return a.status.localeCompare(b.status);
+      return b.timestamp.getTime() - a.timestamp.getTime();
+    });
+  }, [amountMax, amountMin, dateFrom, dateTo, searchTerm, sortBy, statusFilter, typeFilter, user?.transactions]);
 
   const handleTransactionClick = (transactionId: string) => {
     setExpandedTransactionId(
@@ -69,6 +125,14 @@ const History: React.FC = () => {
     { value: 'all', label: 'All Types' },
     { value: 'send', label: 'Sent' },
     { value: 'receive', label: 'Received' }
+  ];
+
+  const sortOptions: { value: SortOption; label: string }[] = [
+    { value: 'latest', label: 'Latest first' },
+    { value: 'oldest', label: 'Oldest first' },
+    { value: 'highest', label: 'Highest amount' },
+    { value: 'lowest', label: 'Lowest amount' },
+    { value: 'status', label: 'Status' },
   ];
 
   return (
@@ -142,6 +206,23 @@ const History: React.FC = () => {
             />
           </div>
 
+          {/* Sort */}
+          <div className="relative mb-3">
+            <ArrowUpDown className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="h-10 w-full rounded-md border border-border/50 bg-card pl-10 pr-3 text-sm text-foreground shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Sort transactions"
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Filters */}
           <Collapsible open={showFilters} onOpenChange={setShowFilters}>
             <CollapsibleTrigger asChild>
@@ -149,9 +230,9 @@ const History: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4" />
                   <span>Filters</span>
-                  {(statusFilter !== 'all' || typeFilter !== 'all') && (
+                  {activeFilterCount > 0 && (
                     <Badge variant="secondary" className="text-xs">
-                      {[statusFilter, typeFilter].filter(f => f !== 'all').length}
+                      {activeFilterCount}
                     </Badge>
                   )}
                 </div>
@@ -185,6 +266,75 @@ const History: React.FC = () => {
                   </Button>
                 ))}
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="date-from">
+                    From date
+                  </label>
+                  <Input
+                    id="date-from"
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="bg-card border-border/50"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="date-to">
+                    To date
+                  </label>
+                  <Input
+                    id="date-to"
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="bg-card border-border/50"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="amount-min">
+                    Min amount
+                  </label>
+                  <Input
+                    id="amount-min"
+                    type="number"
+                    min="0"
+                    inputMode="decimal"
+                    placeholder="0"
+                    value={amountMin}
+                    onChange={(e) => setAmountMin(e.target.value)}
+                    className="bg-card border-border/50"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="amount-max">
+                    Max amount
+                  </label>
+                  <Input
+                    id="amount-max"
+                    type="number"
+                    min="0"
+                    inputMode="decimal"
+                    placeholder="1000"
+                    value={amountMax}
+                    onChange={(e) => setAmountMax(e.target.value)}
+                    className="bg-card border-border/50"
+                  />
+                </div>
+              </div>
+              {activeFilterCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetFilters}
+                  className="w-full gap-2 text-xs"
+                >
+                  <X className="w-3 h-3" />
+                  Clear search, filters, and sort
+                </Button>
+              )}
             </CollapsibleContent>
           </Collapsible>
         </div>
@@ -193,7 +343,7 @@ const History: React.FC = () => {
       <div className="p-6 pt-2">
         {filteredTransactions.length === 0 ? (
           <div className="text-center py-12">
-            {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' ? (
+            {activeFilterCount > 0 ? (
               <div className="space-y-3">
                 <div className="text-4xl">🔍</div>
                 <h3 className="text-lg font-semibold text-foreground">No transactions found</h3>
@@ -203,11 +353,7 @@ const History: React.FC = () => {
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => {
-                    setSearchTerm('');
-                    setStatusFilter('all');
-                    setTypeFilter('all');
-                  }}
+                  onClick={resetFilters}
                 >
                   Clear filters
                 </Button>
@@ -229,15 +375,11 @@ const History: React.FC = () => {
               <p className="text-sm text-muted-foreground">
                 {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''}
               </p>
-              {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all') && (
+              {activeFilterCount > 0 && (
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  onClick={() => {
-                    setSearchTerm('');
-                    setStatusFilter('all');
-                    setTypeFilter('all');
-                  }}
+                  onClick={resetFilters}
                   className="text-xs"
                 >
                   Clear all
